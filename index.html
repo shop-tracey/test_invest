@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool Contract Interaction</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script src="./abi/pool.js"></script>
+    <script src="./abi/token.js"></script>
+</head>
+<body>
+    <h1>Pool Contract Interaction</h1>
+
+    <div>
+        <h2>Start New Round</h2>
+        <input type="text" id="roleC3Ids" placeholder="Role C3 IDs (comma separated)">
+        <input type="text" id="roleC2Ids" placeholder="Role C2 IDs (comma separated)">
+        <input type="text" id="roleC1Ids" placeholder="Role C1 IDs (comma separated)">
+        <input type="text" id="roleBIds" placeholder="Role B IDs (comma separated)">
+        <input type="text" id="roleAIds" placeholder="Role A IDs (comma separated)">
+        <button onclick="startNewRound()">Start New Round</button>
+    </div>
+
+    <div>
+        <h2>Add User</h2>
+        <input type="text" id="accounts" placeholder="Accounts (comma separated)">
+        <button onclick="addUser()">Add User</button>
+    </div>
+
+    <div>
+        <h2>Set Senior</h2>
+        <input type="text" id="userRoleIds" placeholder="User Role IDs (comma separated)">
+        <button onclick="setSenior()">Set Senior</button>
+    </div>
+
+    <div>
+        <h2>Fill Empty Role IDs</h2>
+        <input type="text" id="emptyUserRoleIds" placeholder="User Role IDs (comma separated)">
+        <input type="text" id="emptyAccounts" placeholder="Accounts (comma separated)">
+        <button onclick="fillEmptyRoleIds()">Fill Empty Role IDs</button>
+    </div>
+
+    <div>
+        <h2>Invest</h2>
+        <input type="text" id="superior" placeholder="Superior Address">
+        <button onclick="approveAndInvest()">Approve and Invest</button>
+    </div>
+
+    <button id="connectButton">Connect MetaMask</button>
+    <p>Connected account: <span id="account">None</span></p>
+
+    <script>
+        const contractAddress = '0xbea41361f7d45d7dcfa1012ea7eacb0fbe104a95';
+        const usdtAddress = '0x6De8328fbB59E5E444ED7DFCf1023DC8dFc917DB';
+
+        let web3;
+        let poolContract;
+        let usdtContract;
+
+        async function connectMetaMask() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    poolContract = new web3.eth.Contract(poolABI, contractAddress);
+                    usdtContract = new web3.eth.Contract(tokenABI, usdtAddress);
+                    const accounts = await web3.eth.getAccounts();
+                    document.getElementById('account').innerText = accounts[0];
+                    console.log("MetaMask connected");
+                } catch (error) {
+                    if (error.code === 4001) {
+                        console.error("User denied account access");
+                        alert("You need to allow MetaMask access to use this application.");
+                    } else {
+                        console.error("Error connecting to MetaMask", error);
+                    }
+                }
+            } else {
+                alert('Please install MetaMask!');
+            }
+        }
+
+        window.addEventListener('load', function() {
+            document.getElementById('connectButton').addEventListener('click', connectMetaMask);
+        });
+
+        async function startNewRound() {
+            const accounts = await web3.eth.getAccounts();
+            const roleC3Ids = document.getElementById('roleC3Ids').value.split(',').map(Number);
+            const roleC2Ids = document.getElementById('roleC2Ids').value.split(',').map(Number);
+            const roleC1Ids = document.getElementById('roleC1Ids').value.split(',').map(Number);
+            const roleBIds = document.getElementById('roleBIds').value.split(',').map(Number);
+            const roleAIds = document.getElementById('roleAIds').value.split(',').map(Number);
+
+            await poolContract.methods.startNewRound(roleC3Ids, roleC2Ids, roleC1Ids, roleBIds, roleAIds).send({ from: accounts[0] });
+        }
+
+        async function addUser() {
+            const accounts = await web3.eth.getAccounts();
+            const userAccounts = document.getElementById('accounts').value.split(',');
+
+            await poolContract.methods.addUser(userAccounts).send({ from: accounts[0] });
+        }
+
+        async function setSenior() {
+            const accounts = await web3.eth.getAccounts();
+            const userRoleIds = document.getElementById('userRoleIds').value.split(',').map(Number);
+
+            await poolContract.methods.setSenior(userRoleIds).send({ from: accounts[0] });
+        }
+
+        async function fillEmptyRoleIds() {
+            const accounts = await web3.eth.getAccounts();
+            const userRoleIds = document.getElementById('emptyUserRoleIds').value.split(',').map(Number);
+            const emptyAccounts = document.getElementById('emptyAccounts').value.split(',');
+
+            await poolContract.methods.fillEmptyRoleIds(userRoleIds, emptyAccounts).send({ from: accounts[0] });
+        }
+
+        async function approveAndInvest() {
+            const accounts = await web3.eth.getAccounts();
+            const superior = document.getElementById('superior').value;
+            const price = await poolContract.methods.price().call();
+
+            // Approve the Pool contract to spend USDT
+            await usdtContract.methods.approve(contractAddress, price).send({ from: accounts[0] });
+
+            // Call the invest function
+            await poolContract.methods.invest(superior).send({ from: accounts[0] });
+        }
+    </script>
+</body>
+</html>
